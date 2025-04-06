@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Welcome, {{ session['username'] }}!</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5>Total Predictions</h5>
+                                <h2>{{ predictions_count }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5>Positive Cases</h5>
+                                <h2>{{ positive_count }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5>Negative Cases</h5>
+                                <h2>{{ predictions_count - positive_count }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('predict') }}" class="btn btn-primary">Make New Prediction</a>
+                    <a href="{{ url_for('history') }}" class="btn btn-outline-primary ms-2">View History</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Recent Predictions</h4>
+            </div>
+            <div class="card-body">
+                {% if last_predictions %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Age</th>
+                                <th>Gender</th>
+                                <th>Area</th>
+                                <th>Model Used</th>
+                                <th>Result</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prediction in last_predictions %}
+                            <tr>
+                                <td>{{ prediction['prediction_date'] }}</td>
+                                <td>{{ prediction['age'] }}</td>
+                                <td>{{ prediction['gender'].capitalize() }}</td>
+                                <td>{{ prediction['area'].capitalize() }}</td>
+                                <td>{{ prediction['model_used'] }}</td>
+                                <td>
+                                    {% if prediction['outcome'] == 1 %}
+                                    <span class="badge bg-danger">Positive</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Negative</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ "%.2f"|format(prediction['confidence']) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center">No predictions made yet. <a href="{{ url_for('predict') }}">Make your first prediction</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

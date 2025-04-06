@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Dengue Prediction Form</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('predict') }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="gender" class="form-label">Gender</label>
+                            <select class="form-select" id="gender" name="gender" required>
+                                <option value="" selected disabled>Select Gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="age" class="form-label">Age</label>
+                            <input type="number" class="form-control" id="age" name="age" min="1" max="120" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="nsi" class="form-label">NSI Level</label>
+                            <input type="number" step="0.01" class="form-control" id="nsi" name="nsi" min="0" max="10" required>
+                            <small class="text-muted">Range: 0-10 (Higher values indicate stronger reaction)</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="igg" class="form-label">IgG Level</label>
+                            <input type="number" step="0.01" class="form-control" id="igg" name="igg" min="0" max="15" required>
+                            <small class="text-muted">Range: 0-15 (Higher values indicate stronger antibody presence)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="area" class="form-label">Area</label>
+                            <select class="form-select" id="area" name="area" required>
+                                <option value="" selected disabled>Select Area</option>
+                                <option value="urban">Urban</option>
+                                <option value="rural">Rural</option>
+                                <option value="suburban">Suburban</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="area_type" class="form-label">Area Type</label>
+                            <select class="form-select" id="area_type" name="area_type" required>
+                                <option value="" selected disabled>Select Area Type</option>
+                                <option value="residential">Residential</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="industrial">Industrial</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="house_type" class="form-label">House Type</label>
+                            <select class="form-select" id="house_type" name="house_type" required>
+                                <option value="" selected disabled>Select House Type</option>
+                                <option value="apartment">Apartment</option>
+                                <option value="house">House</option>
+                                <option value="slum">Slum</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="district" class="form-label">District</label>
+                            <select class="form-select" id="district" name="district" required>
+                                <option value="" selected disabled>Select District</option>
+                                <option value="district1">District 1</option>
+                                <option value="district2">District 2</option>
+                                <option value="district3">District 3</option>
+                                <option value="district4">District 4</option>
+                                <option value="district5">District 5</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="model" class="form-label">Select Prediction Model</label>
+                        <select class="form-select" id="model" name="model" required>
+                            <option value="" selected disabled>Select Model</option>
+                            <option value="xgboost">XGBoost (Recommended)</option>
+                            <option value="random_forest">Random Forest</option>
+                            <option value="svm">Support Vector Machine (SVM)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Make Prediction</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

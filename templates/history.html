@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Prediction History</h4>
+        <a href="{{ url_for('predict') }}" class="btn btn-sm btn-primary">New Prediction</a>
+    </div>
+    <div class="card-body">
+        {% if predictions %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Age</th>
+                        <th>Gender</th>
+                        <th>NSI</th>
+                        <th>IgG</th>
+                        <th>Area</th>
+                        <th>House Type</th>
+                        <th>Model</th>
+                        <th>Result</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prediction in predictions %}
+                    <tr>
+                        <td>{{ prediction['prediction_date'] }}</td>
+                        <td>{{ prediction['age'] }}</td>
+                        <td>{{ prediction['gender'].capitalize() }}</td>
+                        <td>{{ prediction['nsi'] }}</td>
+                        <td>{{ prediction['igg'] }}</td>
+                        <td>{{ prediction['area'].capitalize() }}</td>
+                        <td>{{ prediction['house_type'].capitalize() }}</td>
+                        <td>{{ prediction['model_used'] }}</td>
+                        <td>
+                            {% if prediction['outcome'] == 1 %}
+                            <span class="badge bg-danger">Positive</span>
+                            {% else %}
+                            <span class="badge bg-success">Negative</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ "%.2f"|format(prediction['confidence']) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <h5>No prediction history found</h5>
+            <p>Make your first prediction to see results here.</p>
+            <a href="{{ url_for('predict') }}" class="btn btn-primary mt-2">Make a Prediction</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if predictions %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h4 class="mb-0">Statistical Analysis</h4>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <canvas id="resultChart"></canvas>
+            </div>
+            <div class="col-md-6">
+                <canvas id="modelChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if predictions %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Results pie chart
+        const resultCtx = document.getElementById('resultChart').getContext('2d');
+        const resultChart = new Chart(resultCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Positive', 'Negative'],
+                datasets: [{
+                    data: [
+                        {{ predictions|selectattr('outcome', 'equalto', 1)|list|length }},
+                        {{ predictions|selectattr('outcome', 'equalto', 0)|list|length }}
+                    ],
+                    backgroundColor: ['#dc3545', '#28a745']
+                }]
+            },
+            options: {
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Distribution of Prediction Results',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Models bar chart
+        const modelCtx = document.getElementById('modelChart').getContext('2d');
+        
+        // Count model usages
+        const models = {};
+        {% for prediction in predictions %}
+            if (!models['{{ prediction["model_used"] }}']) {
+                models['{{ prediction["model_used"] }}'] = 1;
+            } else {
+                models['{{ prediction["model_used"] }}']++;
+            }
+        {% endfor %}
+        
+        const modelLabels = Object.keys(models);
+        const modelData = Object.values(models);
+        
+        const modelChart = new Chart(modelCtx, {
+            type: 'bar',
+            data: {
+                labels: modelLabels,
+                datasets: [{
+                    label: 'Times Used',
+                    data: modelData,
+                    backgroundColor: '#0a4275'
+                }]
+            },
+            options: {
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Model Usage Distribution',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

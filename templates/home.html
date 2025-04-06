@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header text-center">
+                <h3>Welcome to Dengue Prediction System</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <img src="/static/confusion_matrix_XGBoost.png" alt="Dengue Analysis" class="img-fluid mb-3" onerror="this.src='/api/placeholder/600/400'; this.alt='Placeholder Image'">
+                    </div>
+                    <div class="col-md-6">
+                        <h4>About the System</h4>
+                        <p>The Dengue Prediction System uses advanced machine learning algorithms to predict the likelihood of dengue infection based on various factors like age, gender, NSI levels, IgG levels, and environmental factors.</p>
+                        <p>Our system employs three state-of-the-art models:</p>
+                        <ul>
+                            <li><strong>XGBoost</strong> - Our highest accuracy model</li>
+                            <li><strong>Random Forest</strong> - Excellent feature importance analysis</li>
+                            <li><strong>Support Vector Machine (SVM)</strong> - Great for binary classification</li>
+                        </ul>
+                        <p>Register or login to start making predictions and tracking results.</p>
+                        
+                        {% if 'user_id' not in session %}
+                        <div class="text-center mt-4">
+                            <a href="{{ url_for('login') }}" class="btn btn-primary me-3">Login</a>
+                            <a href="{{ url_for('register') }}" class="btn btn-outline-primary">Register</a>
+                        </div>
+                        {% else %}
+                        <div class="text-center mt-4">
+                            <a href="{{ url_for('predict') }}" class="btn btn-primary">Make a Prediction</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4>Why Use Our System?</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center">
+                                <h5>Early Detection</h5>
+                                <p>Early detection of dengue can significantly improve treatment outcomes and reduce complications.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center">
+                                <h5>High Accuracy</h5>
+                                <p>Our XGBoost model achieves high accuracy in predicting dengue cases based on key indicators.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center">
+                                <h5>Data-Driven Insights</h5>
+                                <p>Gain insights into factors that contribute most to dengue risk in different areas.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

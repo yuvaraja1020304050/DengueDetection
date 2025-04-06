@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Prediction Result</h4>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    {% if prediction['outcome'] == 1 %}
+                    <div class="alert alert-danger py-3">
+                        <h3><i class="fas fa-exclamation-triangle me-2"></i>Dengue Positive</h3>
+                        <p class="mb-0">The prediction indicates a high likelihood of dengue infection.</p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success py-3">
+                        <h3><i class="fas fa-check-circle me-2"></i>Dengue Negative</h3>
+                        <p class="mb-0">The prediction indicates a low likelihood of dengue infection.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Patient Information</h5>
+                        <table class="table">
+                            <tr>
+                                <th>Gender:</th>
+                                <td>{{ prediction['gender'].capitalize() }}</td>
+                            </tr>
+                            <tr>
+                                <th>Age:</th>
+                                <td>{{ prediction['age'] }}</td>
+                            </tr>
+                            <tr>
+                                <th>Area:</th>
+                                <td>{{ prediction['area'].capitalize() }}</td>
+                            </tr>
+                            <tr>
+                                <th>House Type:</th>
+                                <td>{{ prediction['house_type'].capitalize() }}</td>
+                            </tr>
+                            <tr>
+                                <th>District:</th>
+                                <td>{{ prediction['district'].capitalize() }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h5>Medical Indicators</h5>
+                        <table class="table">
+                            <tr>
+                                <th>NSI Level:</th>
+                                <td>{{ prediction['nsi'] }}</td>
+                            </tr>
+                            <tr>
+                                <th>IgG Level:</th>
+                                <td>{{ prediction['igg'] }}</td>
+                            </tr>
+                            <tr>
+                                <th>Prediction Model:</th>
+                                <td>{{ prediction['model_used'] }}</td>
+                            </tr>
+                            <tr>
+                                <th>Confidence:</th>
+                                <td>{{ "%.2f"|format(prediction['confidence']) }}%</td>
+                            </tr>
+                            <tr>
+                                <th>Risk Level:</th>
+                                <td>{{ risk_level }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Recommendations</h5>
+                    {% if prediction['outcome'] == 1 %}
+                    <ul class="list-group mb-3">
+                        <li class="list-group-item">Seek medical attention immediately</li>
+                        <li class="list-group-item">Stay hydrated and monitor temperature</li>
+                        <li class="list-group-item">Get a complete blood count test done</li>
+                        <li class="list-group-item">Avoid self-medication, especially aspirin or ibuprofen</li>
+                    </ul>
+                    {% else %}
+                    <ul class="list-group mb-3">
+                        <li class="list-group-item">Continue monitoring for symptoms</li>
+                        <li class="list-group-item">Use mosquito repellents and nets</li>
+                        <li class="list-group-item">Keep surroundings clean and free of stagnant water</li>
+                        <li class="list-group-item">Consider follow-up testing if symptoms persist</li>
+                    </ul>
+                    {% endif %}
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('predict') }}" class="btn btn-outline-primary">Make Another Prediction</a>
+                    <a href="{{ url_for('history') }}" class="btn btn-primary">View History</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

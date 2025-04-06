@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Model Comparison</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <canvas id="accuracyChart"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Model Performance Summary</h5>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Accuracy</th>
+                                    <th>Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for model, accuracy in models_accuracy.items() %}
+                                <tr>
+                                    <td>{{ model }}</td>
+                                    <td>{{ "%.2f"|format(accuracy * 100) }}%</td>
+                                    <td>
+                                        {% if model == 'XGBoost' %}
+                                        <span class="badge bg-success">Recommended</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Feature Importance - Random Forest -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Random Forest - Feature Importance</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('static', filename='feature_importance_Random Forest.png') }}" alt="Random Forest Feature Importance" class="img-fluid" onerror="this.src='/api/placeholder/600/400'; this.alt='Placeholder Image'">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Feature Importance - XGBoost -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">XGBoost - Feature Importance</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('static', filename='feature_importance_XGBoost.png') }}" alt="XGBoost Feature Importance" class="img-fluid" onerror="this.src='/api/placeholder/600/400'; this.alt='Placeholder Image'">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Confusion Matrix - Random Forest -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Random Forest - Confusion Matrix</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('static', filename='confusion_matrix_Random Forest.png') }}" alt="Random Forest Confusion Matrix" class="img-fluid" onerror="this.src='/api/placeholder/400/300'; this.alt='Placeholder Image'">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Confusion Matrix - XGBoost -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">XGBoost - Confusion Matrix</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('static', filename='confusion_matrix_XGBoost.png') }}" alt="XGBoost Confusion Matrix" class="img-fluid" onerror="this.src='/api/placeholder/400/300'; this.alt='Placeholder Image'">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Confusion Matrix - SVM -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">SVM - Confusion Matrix</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('static', filename='confusion_matrix_SVM.png') }}" alt="SVM Confusion Matrix" class="img-fluid" onerror="this.src='/api/placeholder/400/300'; this.alt='Placeholder Image'">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detailed Model Comparison Report -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Detailed Model Comparison Report</h4>
+            </div>
+            <div class="card-body">
+                <div class="markdown-content">
+                    {{ comparison_report | safe }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recommendations -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Recommendations</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5>Model Selection Guidance</h5>
+                    <p>Based on our analysis, we recommend using the <strong>XGBoost</strong> model for dengue prediction as it provides the highest accuracy. However, each model has its strengths:</p>
+                    <ul>
+                        <li><strong>Random Forest:</strong> More robust to outliers and provides good feature importance insights</li>
+                        <li><strong>XGBoost:</strong> Highest overall accuracy and precision</li>
+                        <li><strong>SVM:</strong> May perform better with smaller datasets or when feature relationships are complex</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>How to Use These Models</h5>
+                    <p>To make a prediction, go to the <a href="{{ url_for('predict') }}">Predict</a> page and select your preferred model based on your specific needs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for Chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Prepare data for chart
+    const ctx = document.getElementById('accuracyChart').getContext('2d');
+    const accuracyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for model in models_accuracy %}'{{ model }}',{% endfor %}],
+            datasets: [{
+                label: 'Model Accuracy (%)',
+                data: [{% for model, accuracy in models_accuracy.items() %}{{ accuracy * 100 }},{% endfor %}],
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(255, 159, 64, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Accuracy (%)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Models'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Model Accuracy Comparison'
+                }
+            }
+        }
+    });
+    
+    // Add markdown rendering for the comparison report
+    // This is optional and depends on if you want to use a markdown library
+    // You might need to include a markdown library like marked.js
+});
+</script>
+{% endblock %}
