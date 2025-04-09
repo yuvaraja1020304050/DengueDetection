@@ -11,6 +11,7 @@ import io
 import base64
 import struct
 from sklearn.metrics import accuracy_score
+from contextlib import contextmanager
 
 app = Flask(__name__)
 app.secret_key = 'dengue_prediction_secret_key'
@@ -33,46 +34,55 @@ def load_models():
 
 models = load_models()
 
-# Database setup
+# Improved database connection handling
 def get_db_connection():
-    conn = sqlite3.connect('instance/dengue_prediction.db')
+    conn = sqlite3.connect('instance/dengue_prediction.db', timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode = WAL')  # Write-Ahead Logging for better concurrency
+    conn.execute('PRAGMA busy_timeout = 5000')  # Set busy timeout to 5 seconds
     return conn
 
-def init_db():
+@contextmanager
+def get_db():
     conn = get_db_connection()
-    conn.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL
-    )
-    ''')
-    
-    conn.execute('''
-    CREATE TABLE IF NOT EXISTS predictions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        gender TEXT NOT NULL,
-        age INTEGER NOT NULL,
-        nsi REAL NOT NULL,
-        igg REAL NOT NULL,
-        area TEXT NOT NULL,
-        area_type TEXT NOT NULL,
-        house_type TEXT NOT NULL,
-        district TEXT NOT NULL,
-        outcome INTEGER NOT NULL,
-        model_used TEXT NOT NULL,
-        confidence REAL NOT NULL,
-        prediction_date TIMESTAMP NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+def init_db():
+    with get_db() as conn:
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL
+        )
+        ''')
+        
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            gender TEXT NOT NULL,
+            age INTEGER NOT NULL,
+            nsi REAL NOT NULL,
+            igg REAL NOT NULL,
+            area TEXT NOT NULL,
+            area_type TEXT NOT NULL,
+            house_type TEXT NOT NULL,
+            district TEXT NOT NULL,
+            outcome INTEGER NOT NULL,
+            model_used TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            prediction_date TIMESTAMP NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        ''')
+        
+        conn.commit()
 
 # Initialize database
 init_db()
@@ -116,24 +126,34 @@ def register():
         name = request.form['name']
         email = request.form['email']
         
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        
-        if user:
-            flash('Username already exists!')
-            conn.close()
+        try:
+            with get_db() as conn:
+                # Check if username exists
+                user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+                
+                if user:
+                    flash('Username already exists!')
+                    return redirect(url_for('register'))
+                
+                # Check if email exists
+                email_check = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+                if email_check:
+                    flash('Email already registered!')
+                    return redirect(url_for('register'))
+                
+                hashed_password = generate_password_hash(password)
+                
+                conn.execute(
+                    'INSERT INTO users (username, password, name, email) VALUES (?, ?, ?, ?)',
+                    (username, hashed_password, name, email)
+                )
+                conn.commit()
+                
+                flash('Registration successful! Please login.')
+                return redirect(url_for('login'))
+        except sqlite3.Error as e:
+            flash(f'Database error: {e}')
             return redirect(url_for('register'))
-        
-        hashed_password = generate_password_hash(password)
-        conn.execute(
-            'INSERT INTO users (username, password, name, email) VALUES (?, ?, ?, ?)',
-            (username, hashed_password, name, email)
-        )
-        conn.commit()
-        conn.close()
-        
-        flash('Registration successful! Please login.')
-        return redirect(url_for('login'))
     
     return render_template('register.html')
 
@@ -143,17 +163,19 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        conn.close()
-        
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            flash('Login successful!')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password')
+        try:
+            with get_db() as conn:
+                user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+                
+                if user and check_password_hash(user['password'], password):
+                    session['user_id'] = user['id']
+                    session['username'] = user['username']
+                    flash('Login successful!')
+                    return redirect(url_for('dashboard'))
+                else:
+                    flash('Invalid username or password')
+        except sqlite3.Error as e:
+            flash(f'Database error: {e}')
     
     return render_template('login.html')
 
@@ -170,23 +192,29 @@ def dashboard():
         flash('Please login first')
         return redirect(url_for('login'))
     
-    conn = get_db_connection()
-    predictions_count = conn.execute('SELECT COUNT(*) FROM predictions WHERE user_id = ?', (session['user_id'],)).fetchone()[0]
-    positive_count = conn.execute('SELECT COUNT(*) FROM predictions WHERE user_id = ? AND outcome = 1', (session['user_id'],)).fetchone()[0]
-    last_predictions_raw = conn.execute('SELECT * FROM predictions WHERE user_id = ? ORDER BY prediction_date DESC LIMIT 5', (session['user_id'],)).fetchall()
-    conn.close()
-    
-    # Process the last predictions to handle the confidence value safely
-    last_predictions = []
-    for prediction in last_predictions_raw:
-        pred_dict = dict(prediction)
-        pred_dict['confidence'] = extract_confidence(prediction)
-        last_predictions.append(pred_dict)
-    
-    return render_template('dashboard.html', 
-                           predictions_count=predictions_count,
-                           positive_count=positive_count,
-                           last_predictions=last_predictions)
+    try:
+        with get_db() as conn:
+            predictions_count = conn.execute('SELECT COUNT(*) FROM predictions WHERE user_id = ?', 
+                                            (session['user_id'],)).fetchone()[0]
+            positive_count = conn.execute('SELECT COUNT(*) FROM predictions WHERE user_id = ? AND outcome = 1', 
+                                        (session['user_id'],)).fetchone()[0]
+            last_predictions_raw = conn.execute('SELECT * FROM predictions WHERE user_id = ? ORDER BY prediction_date DESC LIMIT 5', 
+                                            (session['user_id'],)).fetchall()
+        
+        # Process the last predictions to handle the confidence value safely
+        last_predictions = []
+        for prediction in last_predictions_raw:
+            pred_dict = dict(prediction)
+            pred_dict['confidence'] = extract_confidence(prediction)
+            last_predictions.append(pred_dict)
+        
+        return render_template('dashboard.html', 
+                            predictions_count=predictions_count,
+                            positive_count=positive_count,
+                            last_predictions=last_predictions)
+    except sqlite3.Error as e:
+        flash(f'Database error: {e}')
+        return redirect(url_for('home'))
 
 @app.route('/predict', methods=['GET', 'POST'])
 def predict():
@@ -245,39 +273,42 @@ def predict():
             decision = models[model_key].decision_function(input_array)[0]
             confidence = (1 / (1 + np.exp(-decision))) * 100
         
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('''
-        INSERT INTO predictions 
-        (user_id, gender, age, nsi, igg, area, area_type, house_type, district, outcome, model_used, confidence, prediction_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            session['user_id'], gender, age, nsi, igg, area, area_type, house_type, district, 
-            int(prediction), model_name, confidence, datetime.now()
-        ))
-        conn.commit()
-        prediction_id = cur.lastrowid
-        conn.close()
-        
         try:
-            dataset = pd.read_csv('dengue_dataset.csv')
-            new_data = pd.DataFrame({
-                'gender': [gender],
-                'age': [age],
-                'nsi': [nsi],
-                'igg': [igg],
-                'area': [area],
-                'area_type': [area_type],
-                'house_type': [house_type],
-                'district': [district],
-                'outcome': [int(prediction)]
-            })
-            dataset = pd.concat([dataset, new_data], ignore_index=True)
-            dataset.to_csv('dengue_dataset.csv', index=False)
-        except Exception as e:
-            print(f"Error updating dataset: {e}")
-        
-        return redirect(url_for('result', prediction_id=prediction_id))
+            with get_db() as conn:
+                cur = conn.cursor()
+                cur.execute('''
+                INSERT INTO predictions 
+                (user_id, gender, age, nsi, igg, area, area_type, house_type, district, outcome, model_used, confidence, prediction_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    session['user_id'], gender, age, nsi, igg, area, area_type, house_type, district, 
+                    int(prediction), model_name, confidence, datetime.now()
+                ))
+                conn.commit()
+                prediction_id = cur.lastrowid
+            
+            try:
+                dataset = pd.read_csv('dengue_dataset.csv')
+                new_data = pd.DataFrame({
+                    'gender': [gender],
+                    'age': [age],
+                    'nsi': [nsi],
+                    'igg': [igg],
+                    'area': [area],
+                    'area_type': [area_type],
+                    'house_type': [house_type],
+                    'district': [district],
+                    'outcome': [int(prediction)]
+                })
+                dataset = pd.concat([dataset, new_data], ignore_index=True)
+                dataset.to_csv('dengue_dataset.csv', index=False)
+            except Exception as e:
+                print(f"Error updating dataset: {e}")
+            
+            return redirect(url_for('result', prediction_id=prediction_id))
+        except sqlite3.Error as e:
+            flash(f'Database error: {e}')
+            return redirect(url_for('predict'))
     
     return render_template('predict.html')
 
@@ -287,25 +318,28 @@ def result(prediction_id):
         flash('Please login first')
         return redirect(url_for('login'))
     
-    conn = get_db_connection()
-    prediction_row = conn.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', 
-                              (prediction_id, session['user_id'])).fetchone()
-    conn.close()
-    
-    if not prediction_row:
-        flash('Prediction not found')
+    try:
+        with get_db() as conn:
+            prediction_row = conn.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', 
+                                      (prediction_id, session['user_id'])).fetchone()
+        
+        if not prediction_row:
+            flash('Prediction not found')
+            return redirect(url_for('dashboard'))
+        
+        # Convert the Row object to a dictionary
+        prediction = dict(prediction_row)
+        
+        # Use the extract_confidence function to get a proper floating-point value
+        prediction['confidence'] = extract_confidence(prediction_row)
+        
+        result_text = "Positive" if prediction['outcome'] == 1 else "Negative"
+        risk_level = "High" if prediction['confidence'] > 75 else "Medium" if prediction['confidence'] > 50 else "Low"
+        
+        return render_template('result.html', prediction=prediction, result_text=result_text, risk_level=risk_level)
+    except sqlite3.Error as e:
+        flash(f'Database error: {e}')
         return redirect(url_for('dashboard'))
-    
-    # Convert the Row object to a dictionary
-    prediction = dict(prediction_row)
-    
-    # Use the extract_confidence function to get a proper floating-point value
-    prediction['confidence'] = extract_confidence(prediction_row)
-    
-    result_text = "Positive" if prediction['outcome'] == 1 else "Negative"
-    risk_level = "High" if prediction['confidence'] > 75 else "Medium" if prediction['confidence'] > 50 else "Low"
-    
-    return render_template('result.html', prediction=prediction, result_text=result_text, risk_level=risk_level)
 
 @app.route('/history')
 def history():
@@ -313,18 +347,22 @@ def history():
         flash('Please login first')
         return redirect(url_for('login'))
     
-    conn = get_db_connection()
-    predictions = conn.execute('SELECT * FROM predictions WHERE user_id = ? ORDER BY prediction_date DESC', (session['user_id'],)).fetchall()
-    conn.close()
-    
-    # Also modify the history page to handle the confidence value safely
-    processed_predictions = []
-    for prediction in predictions:
-        pred_dict = dict(prediction)
-        pred_dict['confidence'] = extract_confidence(prediction)
-        processed_predictions.append(pred_dict)
-    
-    return render_template('history.html', predictions=processed_predictions)
+    try:
+        with get_db() as conn:
+            predictions = conn.execute('SELECT * FROM predictions WHERE user_id = ? ORDER BY prediction_date DESC', 
+                                    (session['user_id'],)).fetchall()
+        
+        # Also modify the history page to handle the confidence value safely
+        processed_predictions = []
+        for prediction in predictions:
+            pred_dict = dict(prediction)
+            pred_dict['confidence'] = extract_confidence(prediction)
+            processed_predictions.append(pred_dict)
+        
+        return render_template('history.html', predictions=processed_predictions)
+    except sqlite3.Error as e:
+        flash(f'Database error: {e}')
+        return redirect(url_for('dashboard'))
 
 @app.route('/compare_models')
 def compare_models():
@@ -344,21 +382,25 @@ def compare_models():
         'SVM': 88.7
     }
     
-    labels = list(models_accuracy.keys())
-    accuracies = list(models_accuracy.values())
-    
-    fig, ax = plt.subplots()
-    ax.bar(labels, accuracies, color=['skyblue', 'lightgreen', 'lightcoral'])
-    ax.set_ylabel('Accuracy (%)')
-    ax.set_title('Model Accuracy Comparison')
-    plt.ylim(0, 100)
-    
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    plot_url = base64.b64encode(img.getvalue()).decode()
-    
-    return render_template('compare_models.html', comparison_report=comparison_report, plot_url=plot_url)
+    try:
+        labels = list(models_accuracy.keys())
+        accuracies = list(models_accuracy.values())
+        
+        fig, ax = plt.subplots()
+        ax.bar(labels, accuracies, color=['skyblue', 'lightgreen', 'lightcoral'])
+        ax.set_ylabel('Accuracy (%)')
+        ax.set_title('Model Accuracy Comparison')
+        plt.ylim(0, 100)
+        
+        img = io.BytesIO()
+        plt.savefig(img, format='png')
+        img.seek(0)
+        plot_url = base64.b64encode(img.getvalue()).decode()
+        
+        return render_template('compare_models.html', comparison_report=comparison_report, plot_url=plot_url)
+    except Exception as e:
+        flash(f'Error generating plot: {e}')
+        return render_template('compare_models.html', comparison_report=comparison_report, plot_url=None)
 
 if __name__ == '__main__':
     app.run(debug=True)

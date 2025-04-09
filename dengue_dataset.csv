@@ -1004,3 +1004,6 @@ male,50,7.0,9.0,urban,residential,slum,district5,0
 male,50,7.0,9.0,urban,residential,slum,district5,0
 female,70,9.0,3.0,suburban,industrial,slum,district2,1
 female,80,9.0,2.0,rural,commercial,slum,district4,1
+male,70,10.0,2.0,rural,commercial,slum,district2,1
+male,21,4.0,10.0,rural,commercial,house,district5,0
+male,70,10.0,4.0,suburban,commercial,slum,district2,1
